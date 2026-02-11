@@ -59,8 +59,10 @@ class _ExamScreenState extends State<ExamScreen> {
 
   Future<void> _init() async {
     await _loadQuestions();
-
     if (!mounted) return;
+
+    // IMPORTANT: always initialize selected based on question count FIRST
+    selected = List<int?>.filled(questions.length, null);
 
     if (widget.mode == ExamMode.resume) {
       _restoreAttemptIfAny();
@@ -69,21 +71,31 @@ class _ExamScreenState extends State<ExamScreen> {
       _setupFreshState();
     }
 
+    // Clamp index safely no matter what restore did
+    if (questions.isEmpty) {
+      currentIndex = 0;
+    } else {
+      currentIndex = currentIndex.clamp(0, questions.length - 1);
+    }
+
     _recalculateScore();
     _startTimer();
     _startAutosaveTicker();
+
+    // Ensure UI refresh after restore/setup
+    setState(() {});
   }
 
   Future<void> _loadQuestions() async {
     try {
-      // Try lesson as INT first (most common)
+      // Try lesson as INT first
       QuerySnapshot<Map<String, dynamic>> snapshot = await FirebaseFirestore.instance
           .collection(_collectionName)
           .where('category', isEqualTo: widget.category)
           .where('lesson', isEqualTo: widget.lesson)
           .get();
 
-      // Fallback: if lesson stored as STRING like "1"
+      // Fallback: lesson stored as STRING like "1"
       if (snapshot.docs.isEmpty) {
         snapshot = await FirebaseFirestore.instance
             .collection(_collectionName)
@@ -92,7 +104,6 @@ class _ExamScreenState extends State<ExamScreen> {
             .get();
       }
 
-      // Stable, crash-proof ordering: sort by Firestore document id
       final docs = snapshot.docs.toList()..sort((a, b) => a.id.compareTo(b.id));
 
       if (!mounted) return;
@@ -124,15 +135,21 @@ class _ExamScreenState extends State<ExamScreen> {
       if (savedRemaining is int) {
         remainingSeconds = savedRemaining.clamp(0, _examDurationSeconds);
       }
+
       if (savedIndex is int) {
-        currentIndex = savedIndex.clamp(0, (questions.length - 1).clamp(0, questions.length));
+        currentIndex = savedIndex;
       }
+
       if (savedSelected is List) {
-        selected = savedSelected.map((e) => e == null ? null : e as int).toList();
+        final restored = savedSelected.map((e) => e == null ? null : e as int).toList();
+        // Only accept restore if it matches question length
+        if (restored.length == questions.length) {
+          selected = restored;
+        }
       }
     }
 
-    // If savedSelected length doesn't match, reset safely
+    // If still wrong length, enforce
     if (selected.length != questions.length) {
       selected = List<int?>.filled(questions.length, null);
     }
@@ -234,7 +251,7 @@ class _ExamScreenState extends State<ExamScreen> {
   }
 
   void _selectAnswer(int index) async {
-    if (_isFinishing) return;
+    if (_isFinishing || questions.isEmpty) return;
 
     setState(() {
       selected[currentIndex] = index;
@@ -245,6 +262,8 @@ class _ExamScreenState extends State<ExamScreen> {
   }
 
   void _next() async {
+    if (questions.isEmpty) return;
+
     if (currentIndex < questions.length - 1) {
       setState(() => currentIndex++);
       await _saveAttempt();
@@ -254,6 +273,8 @@ class _ExamScreenState extends State<ExamScreen> {
   }
 
   void _prev() async {
+    if (questions.isEmpty) return;
+
     if (currentIndex > 0) {
       setState(() => currentIndex--);
       await _saveAttempt();
@@ -267,7 +288,6 @@ class _ExamScreenState extends State<ExamScreen> {
     _timer?.cancel();
     _autosaveTimer?.cancel();
 
-    // Delete attempt after completion
     await _box.delete(_attemptKey);
 
     if (!mounted) return;
@@ -298,6 +318,12 @@ class _ExamScreenState extends State<ExamScreen> {
 
     if (questions.isEmpty) {
       return const Scaffold(body: Center(child: Text("No questions found for this lesson.")));
+    }
+
+    // EXTRA GUARD: never crash if selected list got messed up
+    if (selected.length != questions.length) {
+      selected = List<int?>.filled(questions.length, null);
+      currentIndex = 0;
     }
 
     final data = questions[currentIndex].data();
@@ -384,4 +410,5 @@ class _ExamScreenState extends State<ExamScreen> {
 }
 
 enum _FinishReason { timeUp, completed }
+
 
