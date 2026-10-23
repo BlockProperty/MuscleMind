@@ -1,9 +1,15 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
+import '../theme/lux_theme.dart';
+import '../widgets/lux_background.dart';
+import 'mcq_exam_review_screen.dart';
+
 enum ExamMode { newAttempt, resume }
+
+enum _FinishReason { timeUp, completed }
 
 class ExamScreen extends StatefulWidget {
   final String category;
@@ -22,8 +28,9 @@ class ExamScreen extends StatefulWidget {
 }
 
 class _ExamScreenState extends State<ExamScreen> {
-  static const int _examDurationSeconds = 60 * 60; // 60 mins for 50-question lesson pacing
+  static const int _examDurationSeconds = 60 * 60;
   static const String _collectionName = 'questions';
+  static const Color _brandBlue = Color(0xFF39C2FF);
 
   List<QueryDocumentSnapshot<Map<String, dynamic>>> questions = [];
   bool loading = true;
@@ -37,11 +44,10 @@ class _ExamScreenState extends State<ExamScreen> {
 
   bool _isFinishing = false;
 
-  // Selected answer per question index (null if unanswered)
-  List<int?> selected = [];
+  List<int?> selected = const [];
 
   String get _attemptKey => 'mcq::${widget.category}::${widget.lesson}';
-  Box get _box => Hive.box('mcq_attempts');
+  Box<dynamic> get _box => Hive.box<dynamic>('mcq_attempts');
 
   @override
   void initState() {
@@ -61,17 +67,15 @@ class _ExamScreenState extends State<ExamScreen> {
     await _loadQuestions();
     if (!mounted) return;
 
-    // IMPORTANT: always initialize selected based on question count FIRST
     selected = List<int?>.filled(questions.length, null);
 
     if (widget.mode == ExamMode.resume) {
       _restoreAttemptIfAny();
     } else {
-      await _box.delete(_attemptKey); // ensure fresh
+      await _box.delete(_attemptKey);
       _setupFreshState();
     }
 
-    // Clamp index safely no matter what restore did
     if (questions.isEmpty) {
       currentIndex = 0;
     } else {
@@ -82,20 +86,21 @@ class _ExamScreenState extends State<ExamScreen> {
     _startTimer();
     _startAutosaveTicker();
 
-    // Ensure UI refresh after restore/setup
-    setState(() {});
+    if (!mounted) return;
+    setState(() {
+      loading = false;
+    });
   }
 
   Future<void> _loadQuestions() async {
     try {
-      // Try lesson as INT first
-      QuerySnapshot<Map<String, dynamic>> snapshot = await FirebaseFirestore.instance
+      QuerySnapshot<Map<String, dynamic>> snapshot = await FirebaseFirestore
+          .instance
           .collection(_collectionName)
           .where('category', isEqualTo: widget.category)
           .where('lesson', isEqualTo: widget.lesson)
           .get();
 
-      // Fallback: lesson stored as STRING like "1"
       if (snapshot.docs.isEmpty) {
         snapshot = await FirebaseFirestore.instance
             .collection(_collectionName)
@@ -106,16 +111,14 @@ class _ExamScreenState extends State<ExamScreen> {
 
       final docs = snapshot.docs.toList()..sort((a, b) => a.id.compareTo(b.id));
 
+      questions = docs;
+    } catch (e) {
+      questions = [];
       if (!mounted) return;
-
       setState(() {
-        questions = docs;
         loading = false;
       });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => loading = false);
-      _showError("Failed to load questions: $e");
+      _showError('Failed to load questions: $e');
     }
   }
 
@@ -127,6 +130,7 @@ class _ExamScreenState extends State<ExamScreen> {
 
   void _restoreAttemptIfAny() {
     final data = _box.get(_attemptKey);
+
     if (data is Map) {
       final savedRemaining = data['remainingSeconds'];
       final savedIndex = data['currentIndex'];
@@ -141,17 +145,24 @@ class _ExamScreenState extends State<ExamScreen> {
       }
 
       if (savedSelected is List) {
-        final restored = savedSelected.map((e) => e == null ? null : e as int).toList();
-        // Only accept restore if it matches question length
+        final restored = savedSelected.map<int?>((e) {
+          if (e == null) return null;
+          if (e is int) return e;
+          if (e is num) return e.toInt();
+          if (e is String) return int.tryParse(e);
+          return null;
+        }).toList();
+
         if (restored.length == questions.length) {
           selected = restored;
         }
       }
     }
 
-    // If still wrong length, enforce
     if (selected.length != questions.length) {
       selected = List<int?>.filled(questions.length, null);
+      currentIndex = 0;
+      remainingSeconds = _examDurationSeconds;
     }
   }
 
@@ -179,12 +190,14 @@ class _ExamScreenState extends State<ExamScreen> {
   Future<void> _saveAttempt() async {
     if (loading || questions.isEmpty || _isFinishing) return;
 
+    final List<dynamic> selectedForStorage = selected.map((e) => e).toList();
+
     await _box.put(_attemptKey, {
       'category': widget.category,
       'lesson': widget.lesson,
       'remainingSeconds': remainingSeconds,
       'currentIndex': currentIndex,
-      'selected': selected,
+      'selected': selectedForStorage,
       'savedAt': DateTime.now().millisecondsSinceEpoch,
     });
   }
@@ -204,10 +217,11 @@ class _ExamScreenState extends State<ExamScreen> {
   void _recalculateScore() {
     var s = 0;
     for (var i = 0; i < questions.length; i++) {
-      final sel = selected.isNotEmpty ? selected[i] : null;
+      final sel = (i < selected.length) ? selected[i] : null;
       if (sel == null) continue;
 
-      final correct = _safeInt(questions[i].data()['correctIndex'], fallback: -1);
+      final correct =
+          _safeInt(questions[i].data()['correctIndex'], fallback: -1);
       if (sel == correct) s++;
     }
     score = s;
@@ -217,9 +231,9 @@ class _ExamScreenState extends State<ExamScreen> {
     final hours = seconds ~/ 3600;
     final minutes = (seconds % 3600) ~/ 60;
     final secs = seconds % 60;
-    return "${hours.toString().padLeft(2, '0')}:"
-        "${minutes.toString().padLeft(2, '0')}:"
-        "${secs.toString().padLeft(2, '0')}";
+    return '${hours.toString().padLeft(2, '0')}:'
+        '${minutes.toString().padLeft(2, '0')}:'
+        '${secs.toString().padLeft(2, '0')}';
   }
 
   Future<bool> _confirmExit() async {
@@ -229,8 +243,14 @@ class _ExamScreenState extends State<ExamScreen> {
         title: const Text('Exit exam?'),
         content: const Text('Your progress is saved. You can resume later.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Stay')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Exit')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Stay'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Exit'),
+          ),
         ],
       ),
     );
@@ -238,19 +258,23 @@ class _ExamScreenState extends State<ExamScreen> {
   }
 
   void _showError(String message) {
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("Error"),
+        title: const Text('Error'),
         content: Text(message),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK")),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
         ],
       ),
     );
   }
 
-  void _selectAnswer(int index) async {
+  Future<void> _selectAnswer(int index) async {
     if (_isFinishing || questions.isEmpty) return;
 
     setState(() {
@@ -261,8 +285,13 @@ class _ExamScreenState extends State<ExamScreen> {
     await _saveAttempt();
   }
 
-  void _next() async {
+  Future<void> _next() async {
     if (questions.isEmpty) return;
+
+    if (selected[currentIndex] == null) {
+      _showError('Please select an answer before continuing.');
+      return;
+    }
 
     if (currentIndex < questions.length - 1) {
       setState(() => currentIndex++);
@@ -272,7 +301,7 @@ class _ExamScreenState extends State<ExamScreen> {
     }
   }
 
-  void _prev() async {
+  Future<void> _prev() async {
     if (questions.isEmpty) return;
 
     if (currentIndex > 0) {
@@ -292,38 +321,101 @@ class _ExamScreenState extends State<ExamScreen> {
 
     if (!mounted) return;
 
-    final title = reason == _FinishReason.timeUp ? "Time's Up" : "Exam Finished";
+    final Map<String, int> topicCorrect = {};
+    final Map<String, int> topicTotal = {};
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        title: Text(title),
-        content: Text("Your score: $score / ${questions.length}"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
-            child: const Text("OK"),
-          ),
-        ],
+    for (var i = 0; i < questions.length; i++) {
+      final data = questions[i].data();
+
+      final topic = (data['topic'] ??
+              data['subcategory'] ??
+              data['section'] ??
+              widget.category)
+          .toString()
+          .trim();
+
+      topicTotal[topic] = (topicTotal[topic] ?? 0) + 1;
+
+      final sel = selected[i];
+      final correct = _safeInt(data['correctIndex'], fallback: -1);
+
+      if (sel != null && sel == correct) {
+        topicCorrect[topic] = (topicCorrect[topic] ?? 0) + 1;
+      }
+    }
+
+    final answeredCount = selected.where((e) => e != null).length;
+
+    if (!mounted) return;
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => McqExamReviewScreen(
+          category: widget.category,
+          lesson: widget.lesson,
+          score: score,
+          totalQuestions: questions.length,
+          answeredCount: answeredCount,
+          topicCorrect: topicCorrect,
+          topicTotal: topicTotal,
+        ),
       ),
     );
+  }
+
+  Color _timerColor() {
+    if (remainingSeconds <= 30) return const Color(0xFFDC2626);
+    if (remainingSeconds <= 60) return const Color(0xFFEF4444);
+    if (remainingSeconds <= 300) return const Color(0xFFF59E0B);
+    return _brandBlue;
   }
 
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        backgroundColor: LuxTheme.black,
+        body: LuxBackground(
+          child: const Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      );
     }
 
     if (questions.isEmpty) {
-      return const Scaffold(body: Center(child: Text("No questions found for this lesson.")));
+      return Scaffold(
+        backgroundColor: LuxTheme.black,
+        body: LuxBackground(
+          child: Center(
+            child: Text(
+              'No questions found for this lesson.',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.7),
+                fontSize: 15,
+              ),
+            ),
+          ),
+        ),
+      );
     }
 
-    // EXTRA GUARD: never crash if selected list got messed up
     if (selected.length != questions.length) {
-      selected = List<int?>.filled(questions.length, null);
-      currentIndex = 0;
+      return Scaffold(
+        backgroundColor: LuxTheme.black,
+        body: LuxBackground(
+          child: Center(
+            child: Text(
+              'Exam data mismatch. Please restart this lesson exam.',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.7),
+                fontSize: 15,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
     }
 
     final data = questions[currentIndex].data();
@@ -331,6 +423,8 @@ class _ExamScreenState extends State<ExamScreen> {
     final options = _safeStringList(data['options']);
     final picked = selected[currentIndex];
     final answeredCount = selected.where((e) => e != null).length;
+    final progress =
+        questions.isEmpty ? 0.0 : (currentIndex + 1) / questions.length;
 
     return WillPopScope(
       onWillPop: () async {
@@ -339,67 +433,299 @@ class _ExamScreenState extends State<ExamScreen> {
         return ok;
       },
       child: Scaffold(
+        backgroundColor: LuxTheme.black,
         appBar: AppBar(
-          title: Text("Q ${currentIndex + 1}/${questions.length}"),
+          title: Text('Lesson ${widget.lesson} Exam'),
+          centerTitle: true,
           actions: [
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                  _formatTime(remainingSeconds),
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+            Padding(
+              padding: const EdgeInsets.only(right: 14),
+              child: Center(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: LuxTheme.panel,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: _timerColor().withOpacity(0.65)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _timerColor().withOpacity(0.16),
+                        blurRadius: 14,
+                        spreadRadius: 0.5,
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    _formatTime(remainingSeconds),
+                    style: TextStyle(
+                      color: _timerColor(),
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
                 ),
               ),
             ),
           ],
         ),
-        body: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(questionText, style: const TextStyle(fontSize: 18)),
-              const SizedBox(height: 16),
-
-              ...List.generate(options.length, (i) {
-                final isSelected = picked == i;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      backgroundColor: isSelected ? Colors.blueGrey : null,
-                    ),
-                    onPressed: () => _selectAnswer(i),
-                    child: Text(options[i]),
-                  ),
-                );
-              }),
-
-              const Spacer(),
-              Text(
-                "Answered: $answeredCount / ${questions.length}   |   Score so far: $score",
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12),
-              ),
-              const SizedBox(height: 8),
-
-              Row(
+        body: LuxBackground(
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
                 children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: currentIndex == 0 ? null : _prev,
-                      child: const Text("Back"),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: LuxTheme.panel,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: _brandBlue.withOpacity(0.30)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _brandBlue.withOpacity(0.08),
+                          blurRadius: 18,
+                          spreadRadius: 0.8,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          widget.category.toUpperCase(),
+                          style: const TextStyle(
+                            color: _brandBlue,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Question ${currentIndex + 1} of ${questions.length}',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.82),
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(999),
+                          child: LinearProgressIndicator(
+                            value: progress,
+                            minHeight: 8,
+                            backgroundColor: Colors.white.withOpacity(0.08),
+                            valueColor:
+                                const AlwaysStoppedAnimation<Color>(_brandBlue),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Answered: $answeredCount / ${questions.length}   •   Score so far: $score',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.62),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(height: 16),
                   Expanded(
-                    child: ElevatedButton(
-                      onPressed: _next,
-                      child: Text(currentIndex == questions.length - 1 ? "Finish" : "Next"),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: LuxTheme.panel,
+                              borderRadius: BorderRadius.circular(22),
+                              border: Border.all(
+                                  color: _brandBlue.withOpacity(0.28)),
+                            ),
+                            child: Text(
+                              questionText,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 19,
+                                height: 1.45,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          ...List.generate(options.length, (i) {
+                            final isSelected = picked == i;
+
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _AnswerOption(
+                                label: options[i],
+                                index: i,
+                                isSelected: isSelected,
+                                onTap: () => _selectAnswer(i),
+                              ),
+                            );
+                          }),
+                          const SizedBox(height: 8),
+                        ],
+                      ),
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: currentIndex == 0 ? null : _prev,
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            side:
+                                BorderSide(color: _brandBlue.withOpacity(0.45)),
+                            backgroundColor: LuxTheme.panel,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                          ),
+                          child: const Text(
+                            'BACK',
+                            style: TextStyle(
+                              color: _brandBlue,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _next,
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            backgroundColor: _brandBlue.withOpacity(0.14),
+                            foregroundColor: _brandBlue,
+                            elevation: 0,
+                            side:
+                                BorderSide(color: _brandBlue.withOpacity(0.55)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                          ),
+                          child: Text(
+                            currentIndex == questions.length - 1
+                                ? 'FINISH'
+                                : 'NEXT',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AnswerOption extends StatelessWidget {
+  final String label;
+  final int index;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _AnswerOption({
+    required this.label,
+    required this.index,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const Color brandBlue = Color(0xFF39C2FF);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          decoration: BoxDecoration(
+            color: LuxTheme.panel,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: isSelected ? brandBlue : brandBlue.withOpacity(0.30),
+              width: isSelected ? 1.5 : 1,
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: brandBlue.withOpacity(0.18),
+                      blurRadius: 16,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                : [],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isSelected ? brandBlue : brandBlue.withOpacity(0.45),
+                  ),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: brandBlue.withOpacity(0.20),
+                            blurRadius: 12,
+                            spreadRadius: 1,
+                          ),
+                        ]
+                      : [],
+                ),
+                child: Center(
+                  child: Text(
+                    String.fromCharCode(65 + index),
+                    style: TextStyle(
+                      color: isSelected ? brandBlue : Colors.white70,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: isSelected
+                        ? Colors.white
+                        : Colors.white.withOpacity(0.85),
+                    height: 1.45,
+                    fontSize: 15,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
               ),
             ],
           ),
@@ -408,7 +734,3 @@ class _ExamScreenState extends State<ExamScreen> {
     );
   }
 }
-
-enum _FinishReason { timeUp, completed }
-
-
