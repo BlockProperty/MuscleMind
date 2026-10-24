@@ -2,7 +2,7 @@ name: musclemind_app
 description: "MuscleMind – Massage Therapy Learning & OSCE Simulation App"
 publish_to: "none"
 
-version: 1.0.2+8
+version: 1.0.3+9
 
 environment:
   sdk: ">=3.10.0 <4.0.0"
