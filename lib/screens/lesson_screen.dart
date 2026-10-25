@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../core/subscription_guard.dart';
 import '../theme/lux_theme.dart';
 import '../widgets/lux_background.dart';
-import '../widgets/shimmer.dart';
 import 'exam_gate_screen.dart';
 import 'paywall_screen.dart';
 
@@ -22,27 +21,19 @@ class LessonScreen extends StatefulWidget {
 }
 
 class _LessonScreenState extends State<LessonScreen> {
-  static const Color _blue = Color(0xFF39C2FF);
-  static const Color _premium = Colors.orange;
+  static const Color _blue = LuxTheme.accentGlow;
+  static const Color _premium = Color(0xFFFFB547);
 
   @override
   void initState() {
     super.initState();
-
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) setState(() {});
     });
   }
 
-  bool _isLessonUnlocked(int lessonNumber) {
-    if (lessonNumber == 1) return true;
-    if (SubscriptionGuard.isPremium) return true;
-    return false;
-  }
-
-  bool _isFreeLesson(int lessonNumber) {
-    return lessonNumber == 1;
-  }
+  bool _isLessonUnlocked(int lessonNumber) =>
+      lessonNumber == 1 || SubscriptionGuard.isPremium;
 
   @override
   Widget build(BuildContext context) {
@@ -50,47 +41,101 @@ class _LessonScreenState extends State<LessonScreen> {
 
     return Scaffold(
       backgroundColor: LuxTheme.black,
-      appBar: AppBar(
-        title: Text(widget.category),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('MCQ Lessons')),
       body: LuxBackground(
         child: SafeArea(
           child: ListView(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
             children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: LuxTheme.panel,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: _blue.withValues(alpha: 0.72)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _blue.withValues(alpha: 0.10),
+                      blurRadius: 22,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'SELECT A LESSON',
+                      style: TextStyle(
+                        color: _blue,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      widget.category,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        height: 1.2,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      hasPremium
+                          ? 'Premium is active. All ${widget.lessonCount} lessons are ready to practice.'
+                          : 'Lesson 1 is free. Premium unlocks all ${widget.lessonCount} lessons in this category.',
+                      style: const TextStyle(
+                        color: LuxTheme.textSecondary,
+                        fontSize: 13.5,
+                        height: 1.45,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        const _StatChip(
+                          icon: Icons.quiz_outlined,
+                          label: '50 questions',
+                        ),
+                        const SizedBox(width: 8),
+                        const _StatChip(
+                          icon: Icons.timer_outlined,
+                          label: '60 minutes',
+                        ),
+                        const Spacer(),
+                        if (hasPremium)
+                          const Icon(
+                            Icons.workspace_premium_rounded,
+                            color: _premium,
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
               if (hasPremium) ...[
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
                   decoration: BoxDecoration(
-                    color: _premium.withOpacity(0.10),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: _premium.withOpacity(0.45),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _premium.withOpacity(0.08),
-                        blurRadius: 18,
-                        spreadRadius: 1,
-                      ),
-                    ],
+                    color: _premium.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: _premium.withValues(alpha: 0.40)),
                   ),
-                  child: Row(
+                  child: const Row(
                     children: [
-                      Icon(
-                        Icons.workspace_premium_rounded,
-                        color: _premium,
-                        size: 22,
-                      ),
-                      const SizedBox(width: 12),
+                      Icon(Icons.verified_rounded, color: _premium, size: 20),
+                      SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           'Premium Active • All lessons unlocked',
                           style: TextStyle(
-                            color: _premium,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.4,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                       ),
@@ -99,63 +144,58 @@ class _LessonScreenState extends State<LessonScreen> {
                 ),
                 const SizedBox(height: 16),
               ],
-
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: LuxTheme.panel,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: _blue.withOpacity(0.28)),
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      widget.category.toUpperCase(),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: _blue,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      hasPremium
-                          ? 'Premium active. All lessons in this category are unlocked.'
-                          : 'Start with Lesson 1 for free, then unlock full access.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 22),
-              Divider(color: _blue.withOpacity(0.18)),
-              const SizedBox(height: 16),
               ...List.generate(widget.lessonCount, (index) {
                 final lessonNumber = index + 1;
                 final isUnlocked = _isLessonUnlocked(lessonNumber);
-                final isFreeLesson = _isFreeLesson(lessonNumber);
-                final isPremiumUnlocked =
-                    isUnlocked && !isFreeLesson && hasPremium;
-
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.only(bottom: 12),
                   child: _LessonCard(
                     lessonNumber: lessonNumber,
                     category: widget.category,
                     isUnlocked: isUnlocked,
-                    isFreeLesson: isFreeLesson,
-                    isPremiumUnlocked: isPremiumUnlocked,
+                    isFreeLesson: lessonNumber == 1,
+                    isPremiumUnlocked:
+                        isUnlocked && lessonNumber != 1 && hasPremium,
                   ),
                 );
               }),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _StatChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: LuxTheme.black.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: LuxTheme.accentGlow.withValues(alpha: 0.32)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: LuxTheme.accentGlow, size: 14),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -176,13 +216,11 @@ class _LessonCard extends StatelessWidget {
     required this.isPremiumUnlocked,
   });
 
-  static const Color _blue = Color(0xFF39C2FF);
-  static const Color _premium = Colors.orange;
+  static const Color _blue = LuxTheme.accentGlow;
+  static const Color _premium = Color(0xFFFFB547);
 
   @override
   Widget build(BuildContext context) {
-    final showLockedBadge = !isUnlocked && !isFreeLesson;
-
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -190,13 +228,10 @@ class _LessonCard extends StatelessWidget {
         onTap: () {
           if (!isUnlocked) {
             Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const PaywallScreen(),
-              ),
+              MaterialPageRoute(builder: (_) => const PaywallScreen()),
             );
             return;
           }
-
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => ExamGateScreen(
@@ -206,95 +241,94 @@ class _LessonCard extends StatelessWidget {
             ),
           );
         },
-        child: Shimmer(
-          enabled: isUnlocked,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: LuxTheme.panel,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: isUnlocked
-                    ? _blue.withOpacity(0.5)
-                    : Colors.white.withOpacity(0.18),
-              ),
-              boxShadow: isUnlocked
-                  ? [
-                      BoxShadow(
-                        color: _blue.withOpacity(0.08),
-                        blurRadius: 16,
-                        spreadRadius: 1,
-                      ),
-                    ]
-                  : [],
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: LuxTheme.panel,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isUnlocked
+                  ? _blue.withValues(alpha: 0.70)
+                  : Colors.white.withValues(alpha: 0.20),
             ),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isUnlocked ? _blue : Colors.white30,
-                    ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: isUnlocked
+                      ? _blue.withValues(alpha: 0.10)
+                      : Colors.white.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(
+                    color: isUnlocked ? _blue : Colors.white38,
                   ),
-                  child: Center(
-                    child: Text(
-                      '$lessonNumber',
-                      style: TextStyle(
-                        color: isUnlocked ? _blue : Colors.white70,
-                        fontWeight: FontWeight.w900,
-                      ),
+                ),
+                child: Center(
+                  child: Text(
+                    '$lessonNumber',
+                    style: TextStyle(
+                      color: isUnlocked ? Colors.white : Colors.white60,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              'Lesson $lessonNumber',
-                              style: TextStyle(
-                                color: isUnlocked ? _blue : Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w900,
-                              ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            'Lesson $lessonNumber',
+                            style: TextStyle(
+                              color: isUnlocked ? Colors.white : Colors.white60,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          if (isFreeLesson)
-                            _badge('FREE', _blue)
-                          else if (isPremiumUnlocked)
-                            _badge('PREMIUM', _premium)
-                          else if (showLockedBadge)
-                            _badge('LOCKED', Colors.orange),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        isUnlocked
-                            ? 'Practice questions • Timed • Exam-style'
-                            : 'Unlock all lessons with Premium',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.6),
-                          fontSize: 12,
                         ),
+                        const SizedBox(width: 8),
+                        if (isFreeLesson)
+                          _badge('FREE', _blue)
+                        else if (isPremiumUnlocked)
+                          _badge('PREMIUM', _premium)
+                        else if (!isUnlocked)
+                          _badge('LOCKED', Colors.white54),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      isUnlocked
+                          ? '50 exam-style questions • Timed practice'
+                          : 'Premium required to open this lesson',
+                      style: TextStyle(
+                        color: isUnlocked
+                            ? LuxTheme.textSecondary
+                            : Colors.white54,
+                        fontSize: 12,
+                        height: 1.35,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                Icon(
-                  isUnlocked ? Icons.arrow_forward : Icons.lock,
-                  color: isUnlocked ? _blue : Colors.white70,
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                isUnlocked
+                    ? Icons.arrow_forward_ios_rounded
+                    : Icons.lock_outline_rounded,
+                color: isUnlocked ? _blue : Colors.white54,
+                size: 19,
+              ),
+            ],
           ),
         ),
       ),
@@ -303,17 +337,17 @@ class _LessonCard extends StatelessWidget {
 
   Widget _badge(String text, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.6)),
+        border: Border.all(color: color.withValues(alpha: 0.55)),
       ),
       child: Text(
         text,
         style: TextStyle(
           color: color,
-          fontSize: 10,
+          fontSize: 9,
           fontWeight: FontWeight.w900,
           letterSpacing: 0.5,
         ),
