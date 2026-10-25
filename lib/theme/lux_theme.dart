@@ -1,21 +1,22 @@
 import 'package:flutter/material.dart';
 
 class LuxTheme {
-  // Deep Teal Clinical Luxe
-  static const Color primary = Color(0xFF0F766E);
-  static const Color primaryDark = Color(0xFF0B5F59);
-  static const Color accentGlow = Color(0xFF5EEAD4);
+  // MuscleMind electric-blue identity
+  static const Color primary = Color(0xFF168BFF);
+  static const Color primaryDark = Color(0xFF075BB5);
+  static const Color accentGlow = Color(0xFF39C2FF);
 
-  // Premium background (not pure black)
-  static const Color black = Color(0xFF0F172A); // deep navy-slate
-  static const Color panel = Color(0xFF131C2F); // glass surface
-  static const Color panelAlt = Color(0xFF1A263D);
+  // Deep navy surfaces keep the electric blue vivid without using pure black.
+  static const Color black = Color(0xFF071226);
+  static const Color panel = Color(0xFF101D38);
+  static const Color panelAlt = Color(0xFF172746);
 
-  // Backward-compatible name used across UI
+  // Backward-compatible name used across older UI.
   static const Color gold = accentGlow;
 
-  static const Color textPrimary = Color(0xFFE5E7EB);
-  static const Color textSecondary = Color(0xFF9CA3AF);
+  // High-contrast typography for clearer reading on phone screens.
+  static const Color textPrimary = Color(0xFFFFFFFF);
+  static const Color textSecondary = Color(0xFFE2E8F0);
   static const Color danger = Color(0xFFEF4444);
   static const Color warning = Color(0xFFF59E0B);
 
@@ -36,9 +37,7 @@ class LuxTheme {
 
     final OutlineInputBorder inputBorder = OutlineInputBorder(
       borderRadius: BorderRadius.circular(18),
-      borderSide: BorderSide(
-        color: accentGlow.withOpacity(0.18),
-      ),
+      borderSide: BorderSide(color: accentGlow.withValues(alpha: 0.34)),
     );
 
     return ThemeData(
@@ -47,7 +46,7 @@ class LuxTheme {
       colorScheme: scheme,
       scaffoldBackgroundColor: black,
       canvasColor: black,
-      splashColor: accentGlow.withOpacity(0.08),
+      splashColor: accentGlow.withValues(alpha: 0.10),
       highlightColor: Colors.transparent,
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
@@ -58,7 +57,7 @@ class LuxTheme {
         surfaceTintColor: Colors.transparent,
         titleTextStyle: TextStyle(
           fontSize: 20,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w900,
           letterSpacing: 0.4,
           color: textPrimary,
         ),
@@ -80,7 +79,7 @@ class LuxTheme {
         ),
         titleTextStyle: TextStyle(
           fontSize: 20,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w900,
           color: textPrimary,
         ),
         contentTextStyle: TextStyle(
@@ -95,28 +94,20 @@ class LuxTheme {
         contentTextStyle: const TextStyle(
           color: textPrimary,
           fontSize: 14,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
         ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       dividerTheme: DividerThemeData(
-        color: accentGlow.withOpacity(0.22),
+        color: accentGlow.withValues(alpha: 0.30),
         thickness: 1,
         space: 1,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: panelAlt,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
-        ),
-        hintStyle: const TextStyle(
-          color: textSecondary,
-          fontSize: 14,
-        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        hintStyle: const TextStyle(color: textSecondary, fontSize: 14),
         labelStyle: const TextStyle(
           color: textSecondary,
           fontSize: 14,
@@ -126,37 +117,29 @@ class LuxTheme {
         enabledBorder: inputBorder,
         focusedBorder: inputBorder.copyWith(
           borderSide: BorderSide(
-            color: accentGlow.withOpacity(0.55),
-            width: 1.4,
+            color: accentGlow.withValues(alpha: 0.85),
+            width: 1.5,
           ),
         ),
         errorBorder: inputBorder.copyWith(
-          borderSide: const BorderSide(
-            color: danger,
-            width: 1.2,
-          ),
+          borderSide: const BorderSide(color: danger, width: 1.2),
         ),
         focusedErrorBorder: inputBorder.copyWith(
-          borderSide: const BorderSide(
-            color: danger,
-            width: 1.4,
-          ),
+          borderSide: const BorderSide(color: danger, width: 1.4),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: primary,
           foregroundColor: Colors.white,
-          disabledBackgroundColor: primary.withOpacity(0.45),
+          disabledBackgroundColor: primary.withValues(alpha: 0.45),
           disabledForegroundColor: Colors.white70,
           elevation: 0,
           padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           textStyle: const TextStyle(
             fontSize: 16,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w900,
             letterSpacing: 0.4,
           ),
         ),
@@ -164,14 +147,12 @@ class LuxTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: accentGlow,
-          side: BorderSide(color: accentGlow.withOpacity(0.38)),
+          side: BorderSide(color: accentGlow.withValues(alpha: 0.65)),
           padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           textStyle: const TextStyle(
             fontSize: 16,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w900,
             letterSpacing: 0.4,
           ),
         ),
@@ -181,17 +162,13 @@ class LuxTheme {
           foregroundColor: accentGlow,
           textStyle: const TextStyle(
             fontSize: 14,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w800,
             letterSpacing: 0.2,
           ),
         ),
       ),
-      progressIndicatorTheme: const ProgressIndicatorThemeData(
-        color: accentGlow,
-      ),
-      iconTheme: const IconThemeData(
-        color: textPrimary,
-      ),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(color: accentGlow),
+      iconTheme: const IconThemeData(color: textPrimary),
       textTheme: const TextTheme(
         headlineSmall: TextStyle(
           fontSize: 22,
@@ -201,13 +178,13 @@ class LuxTheme {
         ),
         titleLarge: TextStyle(
           fontSize: 18,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w900,
           letterSpacing: 0.3,
           color: textPrimary,
         ),
         titleMedium: TextStyle(
           fontSize: 16,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w800,
           letterSpacing: 0.4,
           color: textPrimary,
         ),
