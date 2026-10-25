@@ -3,7 +3,6 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import '../theme/lux_theme.dart';
 import '../widgets/lux_background.dart';
-import '../widgets/shimmer.dart';
 import 'exam_screen.dart';
 
 class ExamGateScreen extends StatelessWidget {
@@ -18,7 +17,7 @@ class ExamGateScreen extends StatelessWidget {
 
   String get _attemptKey => 'mcq::$category::$lesson';
 
-  static const Color _blue = Color(0xFF39C2FF);
+  static const Color _blue = LuxTheme.accentGlow;
 
   @override
   Widget build(BuildContext context) {
@@ -27,121 +26,192 @@ class ExamGateScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: LuxTheme.black,
-      appBar: AppBar(
-        title: Text('Lesson $lesson'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: Text('Lesson $lesson')),
       body: LuxBackground(
         child: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _header(),
-                const SizedBox(height: 22),
-                Divider(color: _blue.withOpacity(0.18)),
-                const SizedBox(height: 18),
-                const _InfoCard(
-                  icon: Icons.quiz_outlined,
-                  title: "50 Questions",
-                  subtitle: "Current lesson format",
-                ),
-                const SizedBox(height: 12),
-                const _InfoCard(
-                  icon: Icons.timer_outlined,
-                  title: "60 Minutes",
-                  subtitle: "Board pacing: 150 questions / 3 hours",
-                ),
-                const SizedBox(height: 12),
-                const _InfoCard(
-                  icon: Icons.save_outlined,
-                  title: "Auto Save",
-                  subtitle: "Your progress is saved automatically",
-                ),
-                const SizedBox(height: 26),
-                if (!hasAttempt) ...[
-                  _PrimaryAction(
-                    title: "START EXAM",
-                    onTap: () => _start(context),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: LuxTheme.panel,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: _blue.withValues(alpha: 0.72)),
                   ),
-                ] else ...[
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 54,
+                            height: 54,
+                            decoration: BoxDecoration(
+                              color: _blue.withValues(alpha: 0.10),
+                              borderRadius: BorderRadius.circular(17),
+                              border: Border.all(color: _blue),
+                            ),
+                            child: const Icon(
+                              Icons.quiz_outlined,
+                              color: _blue,
+                              size: 27,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  category.toUpperCase(),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: _blue,
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 1.1,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Lesson $lesson Practice Exam',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Practice under realistic pacing while your answers and progress are saved automatically.',
+                        style: TextStyle(
+                          color: LuxTheme.textSecondary,
+                          fontSize: 13.5,
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Row(
+                  children: [
+                    Expanded(
+                      child: _InfoCard(
+                        icon: Icons.quiz_outlined,
+                        title: '50',
+                        subtitle: 'Questions',
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: _InfoCard(
+                        icon: Icons.timer_outlined,
+                        title: '60 min',
+                        subtitle: 'Time limit',
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: _InfoCard(
+                        icon: Icons.save_outlined,
+                        title: 'Auto',
+                        subtitle: 'Progress save',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: LuxTheme.panel,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: _blue.withValues(alpha: 0.32)),
+                  ),
+                  child: const Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.info_outline_rounded, color: _blue, size: 21),
+                      SizedBox(width: 11),
+                      Expanded(
+                        child: Text(
+                          'Answer each question before moving forward. You can go back to review earlier answers before finishing.',
+                          style: TextStyle(
+                            color: LuxTheme.textSecondary,
+                            fontSize: 12.5,
+                            height: 1.45,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                if (!hasAttempt)
                   _PrimaryAction(
-                    title: "RESUME EXAM",
+                    title: 'START PRACTICE EXAM',
+                    icon: Icons.play_arrow_rounded,
+                    onTap: () => _start(context),
+                  )
+                else ...[
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: _blue.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: _blue.withValues(alpha: 0.32)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.history_rounded, color: _blue, size: 20),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Saved attempt found. Continue where you left off.',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _PrimaryAction(
+                    title: 'RESUME PRACTICE EXAM',
+                    icon: Icons.play_arrow_rounded,
                     onTap: () => _resume(context),
                   ),
                   const SizedBox(height: 12),
-                  _SecondaryAction(
-                    title: "RESTART EXAM",
-                    onTap: () => _restart(context, box),
+                  OutlinedButton.icon(
+                    onPressed: () => _restart(context, box),
+                    icon: const Icon(Icons.restart_alt_rounded),
+                    label: const Text('RESTART EXAM'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFFF6B6B),
+                      side: BorderSide(
+                        color: const Color(0xFFFF6B6B).withValues(alpha: 0.65),
+                      ),
+                      backgroundColor: LuxTheme.panel,
+                    ),
                   ),
                 ],
               ],
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _header() {
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: LuxTheme.panel,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: _blue.withOpacity(0.28)),
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: _blue.withOpacity(0.18),
-                  blurRadius: 28,
-                  spreadRadius: 4,
-                ),
-              ],
-            ),
-            child: Image.asset(
-              'assets/logo/musclemind_icon.png',
-              width: 78,
-              height: 78,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            category.toUpperCase(),
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: _blue,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            "Lesson $lesson Exam",
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.85),
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            "Build speed, confidence, and exam discipline with focused practice.",
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.70),
-              height: 1.4,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -187,7 +257,7 @@ class ExamGateScreen extends StatelessWidget {
             onPressed: () => Navigator.pop(context, true),
             child: const Text(
               'Restart',
-              style: TextStyle(color: Colors.red),
+              style: TextStyle(color: Color(0xFFFF6B6B)),
             ),
           ),
         ],
@@ -213,49 +283,38 @@ class _InfoCard extends StatelessWidget {
     required this.subtitle,
   });
 
-  static const Color _blue = Color(0xFF39C2FF);
-
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
       decoration: BoxDecoration(
         color: LuxTheme.panel,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _blue.withOpacity(0.30)),
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(
+          color: LuxTheme.accentGlow.withValues(alpha: 0.42),
+        ),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: _blue),
+          Icon(icon, color: LuxTheme.accentGlow, size: 22),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
             ),
-            child: Icon(icon, color: _blue),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: _blue,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.65),
-                    fontSize: 12.5,
-                  ),
-                ),
-              ],
+          const SizedBox(height: 3),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: LuxTheme.textSecondary,
+              fontSize: 10.5,
+              height: 1.25,
             ),
           ),
         ],
@@ -266,78 +325,26 @@ class _InfoCard extends StatelessWidget {
 
 class _PrimaryAction extends StatelessWidget {
   final String title;
+  final IconData icon;
   final VoidCallback onTap;
 
   const _PrimaryAction({
     required this.title,
+    required this.icon,
     required this.onTap,
   });
 
-  static const Color _blue = Color(0xFF39C2FF);
-
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: Shimmer(
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 18),
-            decoration: BoxDecoration(
-              color: LuxTheme.panel,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: _blue.withOpacity(0.55)),
-            ),
-            child: Center(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  color: _blue,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SecondaryAction extends StatelessWidget {
-  final String title;
-  final VoidCallback onTap;
-
-  const _SecondaryAction({
-    required this.title,
-    required this.onTap,
-  });
-
-  static const Color _blue = Color(0xFF39C2FF);
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton(
+    return ElevatedButton.icon(
       onPressed: onTap,
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        side: BorderSide(color: Colors.red.withOpacity(0.6)),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-        ),
-        backgroundColor: LuxTheme.panel,
-      ),
-      child: const Text(
-        "RESTART EXAM",
-        style: TextStyle(
-          color: Colors.red,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 1,
-        ),
+      icon: Icon(icon),
+      label: Text(title),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: LuxTheme.accentGlow,
+        foregroundColor: LuxTheme.black,
+        side: const BorderSide(color: LuxTheme.accentGlow),
+        padding: const EdgeInsets.symmetric(vertical: 17),
       ),
     );
   }
