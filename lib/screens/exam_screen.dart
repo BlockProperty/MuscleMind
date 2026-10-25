@@ -8,7 +8,6 @@ import '../widgets/lux_background.dart';
 import 'mcq_exam_review_screen.dart';
 
 enum ExamMode { newAttempt, resume }
-
 enum _FinishReason { timeUp, completed }
 
 class ExamScreen extends StatefulWidget {
@@ -16,12 +15,7 @@ class ExamScreen extends StatefulWidget {
   final int lesson;
   final ExamMode mode;
 
-  const ExamScreen({
-    super.key,
-    required this.category,
-    required this.lesson,
-    required this.mode,
-  });
+  const ExamScreen({super.key, required this.category, required this.lesson, required this.mode});
 
   @override
   State<ExamScreen> createState() => _ExamScreenState();
@@ -30,20 +24,16 @@ class ExamScreen extends StatefulWidget {
 class _ExamScreenState extends State<ExamScreen> {
   static const int _examDurationSeconds = 60 * 60;
   static const String _collectionName = 'questions';
-  static const Color _brandBlue = Color(0xFF39C2FF);
+  static const Color _brandBlue = LuxTheme.accentGlow;
 
   List<QueryDocumentSnapshot<Map<String, dynamic>>> questions = [];
   bool loading = true;
-
   int currentIndex = 0;
   int score = 0;
-
   late int remainingSeconds;
   Timer? _timer;
   Timer? _autosaveTimer;
-
   bool _isFinishing = false;
-
   List<int?> selected = const [];
 
   String get _attemptKey => 'mcq::${widget.category}::${widget.lesson}';
@@ -66,41 +56,28 @@ class _ExamScreenState extends State<ExamScreen> {
   Future<void> _init() async {
     await _loadQuestions();
     if (!mounted) return;
-
     selected = List<int?>.filled(questions.length, null);
-
     if (widget.mode == ExamMode.resume) {
       _restoreAttemptIfAny();
     } else {
       await _box.delete(_attemptKey);
       _setupFreshState();
     }
-
-    if (questions.isEmpty) {
-      currentIndex = 0;
-    } else {
-      currentIndex = currentIndex.clamp(0, questions.length - 1);
-    }
-
+    currentIndex = questions.isEmpty ? 0 : currentIndex.clamp(0, questions.length - 1);
     _recalculateScore();
     _startTimer();
     _startAutosaveTicker();
-
     if (!mounted) return;
-    setState(() {
-      loading = false;
-    });
+    setState(() => loading = false);
   }
 
   Future<void> _loadQuestions() async {
     try {
-      QuerySnapshot<Map<String, dynamic>> snapshot = await FirebaseFirestore
-          .instance
+      QuerySnapshot<Map<String, dynamic>> snapshot = await FirebaseFirestore.instance
           .collection(_collectionName)
           .where('category', isEqualTo: widget.category)
           .where('lesson', isEqualTo: widget.lesson)
           .get();
-
       if (snapshot.docs.isEmpty) {
         snapshot = await FirebaseFirestore.instance
             .collection(_collectionName)
@@ -108,16 +85,11 @@ class _ExamScreenState extends State<ExamScreen> {
             .where('lesson', isEqualTo: widget.lesson.toString())
             .get();
       }
-
-      final docs = snapshot.docs.toList()..sort((a, b) => a.id.compareTo(b.id));
-
-      questions = docs;
+      questions = snapshot.docs.toList()..sort((a, b) => a.id.compareTo(b.id));
     } catch (e) {
       questions = [];
       if (!mounted) return;
-      setState(() {
-        loading = false;
-      });
+      setState(() => loading = false);
       _showError('Failed to load questions: $e');
     }
   }
@@ -130,20 +102,12 @@ class _ExamScreenState extends State<ExamScreen> {
 
   void _restoreAttemptIfAny() {
     final data = _box.get(_attemptKey);
-
     if (data is Map) {
       final savedRemaining = data['remainingSeconds'];
       final savedIndex = data['currentIndex'];
       final savedSelected = data['selected'];
-
-      if (savedRemaining is int) {
-        remainingSeconds = savedRemaining.clamp(0, _examDurationSeconds);
-      }
-
-      if (savedIndex is int) {
-        currentIndex = savedIndex;
-      }
-
+      if (savedRemaining is int) remainingSeconds = savedRemaining.clamp(0, _examDurationSeconds);
+      if (savedIndex is int) currentIndex = savedIndex;
       if (savedSelected is List) {
         final restored = savedSelected.map<int?>((e) {
           if (e == null) return null;
@@ -152,13 +116,9 @@ class _ExamScreenState extends State<ExamScreen> {
           if (e is String) return int.tryParse(e);
           return null;
         }).toList();
-
-        if (restored.length == questions.length) {
-          selected = restored;
-        }
+        if (restored.length == questions.length) selected = restored;
       }
     }
-
     if (selected.length != questions.length) {
       selected = List<int?>.filled(questions.length, null);
       currentIndex = 0;
@@ -170,7 +130,6 @@ class _ExamScreenState extends State<ExamScreen> {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (t) async {
       if (!mounted || _isFinishing) return;
-
       if (remainingSeconds > 0) {
         setState(() => remainingSeconds--);
       } else {
@@ -182,22 +141,17 @@ class _ExamScreenState extends State<ExamScreen> {
 
   void _startAutosaveTicker() {
     _autosaveTimer?.cancel();
-    _autosaveTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-      _saveAttempt();
-    });
+    _autosaveTimer = Timer.periodic(const Duration(seconds: 10), (_) => _saveAttempt());
   }
 
   Future<void> _saveAttempt() async {
     if (loading || questions.isEmpty || _isFinishing) return;
-
-    final List<dynamic> selectedForStorage = selected.map((e) => e).toList();
-
     await _box.put(_attemptKey, {
       'category': widget.category,
       'lesson': widget.lesson,
       'remainingSeconds': remainingSeconds,
       'currentIndex': currentIndex,
-      'selected': selectedForStorage,
+      'selected': selected.map((e) => e).toList(),
       'savedAt': DateTime.now().millisecondsSinceEpoch,
     });
   }
@@ -209,20 +163,14 @@ class _ExamScreenState extends State<ExamScreen> {
     return fallback;
   }
 
-  List<String> _safeStringList(dynamic v) {
-    if (v is List) return v.map((e) => e.toString()).toList();
-    return const <String>[];
-  }
+  List<String> _safeStringList(dynamic v) => v is List ? v.map((e) => e.toString()).toList() : const <String>[];
 
   void _recalculateScore() {
     var s = 0;
     for (var i = 0; i < questions.length; i++) {
-      final sel = (i < selected.length) ? selected[i] : null;
+      final sel = i < selected.length ? selected[i] : null;
       if (sel == null) continue;
-
-      final correct =
-          _safeInt(questions[i].data()['correctIndex'], fallback: -1);
-      if (sel == correct) s++;
+      if (sel == _safeInt(questions[i].data()['correctIndex'], fallback: -1)) s++;
     }
     score = s;
   }
@@ -231,9 +179,7 @@ class _ExamScreenState extends State<ExamScreen> {
     final hours = seconds ~/ 3600;
     final minutes = (seconds % 3600) ~/ 60;
     final secs = seconds % 60;
-    return '${hours.toString().padLeft(2, '0')}:'
-        '${minutes.toString().padLeft(2, '0')}:'
-        '${secs.toString().padLeft(2, '0')}';
+    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
   Future<bool> _confirmExit() async {
@@ -243,14 +189,8 @@ class _ExamScreenState extends State<ExamScreen> {
         title: const Text('Exit exam?'),
         content: const Text('Your progress is saved. You can resume later.'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Stay'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Exit'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Stay')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Exit')),
         ],
       ),
     );
@@ -262,37 +202,28 @@ class _ExamScreenState extends State<ExamScreen> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Error'),
+        title: const Text('Attention'),
         content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
       ),
     );
   }
 
   Future<void> _selectAnswer(int index) async {
     if (_isFinishing || questions.isEmpty) return;
-
     setState(() {
       selected[currentIndex] = index;
       _recalculateScore();
     });
-
     await _saveAttempt();
   }
 
   Future<void> _next() async {
     if (questions.isEmpty) return;
-
     if (selected[currentIndex] == null) {
-      _showError('Please select an answer before continuing.');
+      _showError('Select an answer before continuing.');
       return;
     }
-
     if (currentIndex < questions.length - 1) {
       setState(() => currentIndex++);
       await _saveAttempt();
@@ -302,52 +233,30 @@ class _ExamScreenState extends State<ExamScreen> {
   }
 
   Future<void> _prev() async {
-    if (questions.isEmpty) return;
-
-    if (currentIndex > 0) {
-      setState(() => currentIndex--);
-      await _saveAttempt();
-    }
+    if (questions.isEmpty || currentIndex == 0) return;
+    setState(() => currentIndex--);
+    await _saveAttempt();
   }
 
   Future<void> _finishExam({required _FinishReason reason}) async {
     if (_isFinishing) return;
     _isFinishing = true;
-
     _timer?.cancel();
     _autosaveTimer?.cancel();
-
     await _box.delete(_attemptKey);
-
     if (!mounted) return;
 
     final Map<String, int> topicCorrect = {};
     final Map<String, int> topicTotal = {};
-
     for (var i = 0; i < questions.length; i++) {
       final data = questions[i].data();
-
-      final topic = (data['topic'] ??
-              data['subcategory'] ??
-              data['section'] ??
-              widget.category)
-          .toString()
-          .trim();
-
+      final topic = (data['topic'] ?? data['subcategory'] ?? data['section'] ?? widget.category).toString().trim();
       topicTotal[topic] = (topicTotal[topic] ?? 0) + 1;
-
-      final sel = selected[i];
       final correct = _safeInt(data['correctIndex'], fallback: -1);
-
-      if (sel != null && sel == correct) {
-        topicCorrect[topic] = (topicCorrect[topic] ?? 0) + 1;
-      }
+      if (selected[i] != null && selected[i] == correct) topicCorrect[topic] = (topicCorrect[topic] ?? 0) + 1;
     }
-
     final answeredCount = selected.where((e) => e != null).length;
-
     if (!mounted) return;
-
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (_) => McqExamReviewScreen(
@@ -366,55 +275,28 @@ class _ExamScreenState extends State<ExamScreen> {
   Color _timerColor() {
     if (remainingSeconds <= 30) return const Color(0xFFDC2626);
     if (remainingSeconds <= 60) return const Color(0xFFEF4444);
-    if (remainingSeconds <= 300) return const Color(0xFFF59E0B);
+    if (remainingSeconds <= 300) return const Color(0xFFFFB547);
     return _brandBlue;
   }
 
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return Scaffold(
+      return const Scaffold(
         backgroundColor: LuxTheme.black,
-        body: LuxBackground(
-          child: const Center(
-            child: CircularProgressIndicator(),
-          ),
-        ),
+        body: LuxBackground(child: Center(child: CircularProgressIndicator())),
       );
     }
-
     if (questions.isEmpty) {
-      return Scaffold(
+      return const Scaffold(
         backgroundColor: LuxTheme.black,
-        body: LuxBackground(
-          child: Center(
-            child: Text(
-              'No questions found for this lesson.',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
-                fontSize: 15,
-              ),
-            ),
-          ),
-        ),
+        body: LuxBackground(child: Center(child: Text('No questions found for this lesson.', style: TextStyle(color: Colors.white, fontSize: 15)))),
       );
     }
-
     if (selected.length != questions.length) {
-      return Scaffold(
+      return const Scaffold(
         backgroundColor: LuxTheme.black,
-        body: LuxBackground(
-          child: Center(
-            child: Text(
-              'Exam data mismatch. Please restart this lesson exam.',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
-                fontSize: 15,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
+        body: LuxBackground(child: Center(child: Padding(padding: EdgeInsets.all(24), child: Text('Exam data mismatch. Please restart this lesson exam.', style: TextStyle(color: Colors.white, fontSize: 15), textAlign: TextAlign.center)))),
       );
     }
 
@@ -423,8 +305,7 @@ class _ExamScreenState extends State<ExamScreen> {
     final options = _safeStringList(data['options']);
     final picked = selected[currentIndex];
     final answeredCount = selected.where((e) => e != null).length;
-    final progress =
-        questions.isEmpty ? 0.0 : (currentIndex + 1) / questions.length;
+    final progress = (currentIndex + 1) / questions.length;
 
     return WillPopScope(
       onWillPop: () async {
@@ -435,35 +316,26 @@ class _ExamScreenState extends State<ExamScreen> {
       child: Scaffold(
         backgroundColor: LuxTheme.black,
         appBar: AppBar(
-          title: Text('Lesson ${widget.lesson} Exam'),
-          centerTitle: true,
+          title: Text('Lesson ${widget.lesson}'),
           actions: [
             Padding(
-              padding: const EdgeInsets.only(right: 14),
+              padding: const EdgeInsets.only(right: 12),
               child: Center(
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
                   decoration: BoxDecoration(
                     color: LuxTheme.panel,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: _timerColor().withOpacity(0.65)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _timerColor().withOpacity(0.16),
-                        blurRadius: 14,
-                        spreadRadius: 0.5,
-                      ),
-                    ],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: _timerColor().withValues(alpha: 0.75)),
                   ),
-                  child: Text(
-                    _formatTime(remainingSeconds),
-                    style: TextStyle(
-                      color: _timerColor(),
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1.1,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.timer_outlined, color: _timerColor(), size: 16),
+                      const SizedBox(width: 5),
+                      Text(_formatTime(remainingSeconds), style: TextStyle(color: _timerColor(), fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+                    ],
                   ),
                 ),
               ),
@@ -473,158 +345,104 @@ class _ExamScreenState extends State<ExamScreen> {
         body: LuxBackground(
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               child: Column(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 13),
                     decoration: BoxDecoration(
                       color: LuxTheme.panel,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: _brandBlue.withOpacity(0.30)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: _brandBlue.withOpacity(0.08),
-                          blurRadius: 18,
-                          spreadRadius: 0.8,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: _brandBlue.withValues(alpha: 0.62)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(
-                          widget.category.toUpperCase(),
-                          style: const TextStyle(
-                            color: _brandBlue,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.5,
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(widget.category.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _brandBlue, fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+                                  const SizedBox(height: 4),
+                                  Text('Question ${currentIndex + 1} of ${questions.length}', style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(color: _brandBlue.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(999)),
+                              child: Text('$answeredCount answered', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Question ${currentIndex + 1} of ${questions.length}',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.82),
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 11),
                         ClipRRect(
                           borderRadius: BorderRadius.circular(999),
-                          child: LinearProgressIndicator(
-                            value: progress,
-                            minHeight: 8,
-                            backgroundColor: Colors.white.withOpacity(0.08),
-                            valueColor:
-                                const AlwaysStoppedAnimation<Color>(_brandBlue),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          'Answered: $answeredCount / ${questions.length}   •   Score so far: $score',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.62),
-                            fontSize: 12,
-                          ),
+                          child: LinearProgressIndicator(value: progress, minHeight: 7, backgroundColor: Colors.white12, valueColor: const AlwaysStoppedAnimation<Color>(_brandBlue)),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   Expanded(
                     child: SingleChildScrollView(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(20),
+                            padding: const EdgeInsets.all(18),
                             decoration: BoxDecoration(
                               color: LuxTheme.panel,
-                              borderRadius: BorderRadius.circular(22),
-                              border: Border.all(
-                                  color: _brandBlue.withOpacity(0.28)),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: _brandBlue.withValues(alpha: 0.52)),
                             ),
-                            child: Text(
-                              questionText,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 19,
-                                height: 1.45,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                            child: Text(questionText, style: const TextStyle(color: Colors.white, fontSize: 18, height: 1.45, fontWeight: FontWeight.w700)),
                           ),
-                          const SizedBox(height: 18),
-                          ...List.generate(options.length, (i) {
-                            final isSelected = picked == i;
-
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: _AnswerOption(
-                                label: options[i],
-                                index: i,
-                                isSelected: isSelected,
-                                onTap: () => _selectAnswer(i),
-                              ),
-                            );
-                          }),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 14),
+                          const Text('SELECT ONE ANSWER', style: TextStyle(color: _brandBlue, fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: 1.25)),
+                          const SizedBox(height: 9),
+                          ...List.generate(options.length, (i) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _AnswerOption(label: options[i], index: i, isSelected: picked == i, onTap: () => _selectAnswer(i)),
+                          )),
+                          const SizedBox(height: 4),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   Row(
                     children: [
                       Expanded(
-                        child: OutlinedButton(
+                        child: OutlinedButton.icon(
                           onPressed: currentIndex == 0 ? null : _prev,
+                          icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                          label: const Text('BACK'),
                           style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            side:
-                                BorderSide(color: _brandBlue.withOpacity(0.45)),
+                            padding: const EdgeInsets.symmetric(vertical: 15),
+                            foregroundColor: Colors.white,
+                            disabledForegroundColor: Colors.white30,
+                            side: BorderSide(color: currentIndex == 0 ? Colors.white12 : _brandBlue.withValues(alpha: 0.55)),
                             backgroundColor: LuxTheme.panel,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                          ),
-                          child: const Text(
-                            'BACK',
-                            style: TextStyle(
-                              color: _brandBlue,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1,
-                            ),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
-                        child: ElevatedButton(
+                        child: ElevatedButton.icon(
                           onPressed: _next,
+                          icon: Icon(currentIndex == questions.length - 1 ? Icons.check_rounded : Icons.arrow_forward_rounded, size: 19),
+                          label: Text(currentIndex == questions.length - 1 ? 'FINISH' : 'NEXT'),
                           style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            backgroundColor: _brandBlue.withOpacity(0.14),
-                            foregroundColor: _brandBlue,
+                            padding: const EdgeInsets.symmetric(vertical: 15),
+                            backgroundColor: _brandBlue,
+                            foregroundColor: const Color(0xFF06131E),
                             elevation: 0,
-                            side:
-                                BorderSide(color: _brandBlue.withOpacity(0.55)),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                          ),
-                          child: Text(
-                            currentIndex == questions.length - 1
-                                ? 'FINISH'
-                                : 'NEXT',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1,
-                            ),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            textStyle: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.8),
                           ),
                         ),
                       ),
@@ -646,85 +464,48 @@ class _AnswerOption extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onTap;
 
-  const _AnswerOption({
-    required this.label,
-    required this.index,
-    required this.isSelected,
-    required this.onTap,
-  });
+  const _AnswerOption({required this.label, required this.index, required this.isSelected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    const Color brandBlue = Color(0xFF39C2FF);
-
+    const brandBlue = LuxTheme.accentGlow;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
           decoration: BoxDecoration(
-            color: LuxTheme.panel,
+            color: isSelected ? brandBlue.withValues(alpha: 0.13) : LuxTheme.panel,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: isSelected ? brandBlue : brandBlue.withOpacity(0.30),
-              width: isSelected ? 1.5 : 1,
-            ),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: brandBlue.withOpacity(0.18),
-                      blurRadius: 16,
-                      spreadRadius: 1,
-                    ),
-                  ]
-                : [],
+            border: Border.all(color: isSelected ? brandBlue : brandBlue.withValues(alpha: 0.38), width: isSelected ? 2 : 1),
+            boxShadow: isSelected ? [BoxShadow(color: brandBlue.withValues(alpha: 0.16), blurRadius: 16)] : null,
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 34,
-                height: 34,
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
+                  color: isSelected ? brandBlue : Colors.transparent,
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isSelected ? brandBlue : brandBlue.withOpacity(0.45),
-                  ),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: brandBlue.withOpacity(0.20),
-                            blurRadius: 12,
-                            spreadRadius: 1,
-                          ),
-                        ]
-                      : [],
+                  border: Border.all(color: brandBlue, width: isSelected ? 2 : 1),
                 ),
                 child: Center(
-                  child: Text(
-                    String.fromCharCode(65 + index),
-                    style: TextStyle(
-                      color: isSelected ? brandBlue : Colors.white70,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
+                  child: isSelected
+                      ? const Icon(Icons.check_rounded, color: Color(0xFF06131E), size: 21)
+                      : Text(String.fromCharCode(65 + index), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 13),
               Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    color: isSelected
-                        ? Colors.white
-                        : Colors.white.withOpacity(0.85),
-                    height: 1.45,
-                    fontSize: 15,
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  ),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(label, style: TextStyle(color: Colors.white, height: 1.42, fontSize: 15.5, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600)),
                 ),
               ),
             ],
