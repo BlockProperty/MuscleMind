@@ -71,6 +71,8 @@ class _TherapeuticExerciseStationTimedState extends State<TherapeuticExerciseSta
 
   late final AnimationController _pulse;
   late final Animation<double> _pulseAnim;
+  late final AnimationController _doorController;
+  late final Animation<double> _doorAnimation;
 
   String get _doorSectionTitle {
     final value = widget.doorSectionTitleOverride?.trim();
@@ -82,6 +84,8 @@ class _TherapeuticExerciseStationTimedState extends State<TherapeuticExerciseSta
     super.initState();
     _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
     _pulseAnim = Tween<double>(begin: 1, end: 1.07).animate(CurvedAnimation(parent: _pulse, curve: Curves.easeInOut));
+    _doorController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1450));
+    _doorAnimation = CurvedAnimation(parent: _doorController, curve: Curves.easeInOutCubic);
     _bootstrap();
   }
 
@@ -97,12 +101,14 @@ class _TherapeuticExerciseStationTimedState extends State<TherapeuticExerciseSta
   void dispose() {
     _timer?.cancel();
     _pulse.dispose();
+    _doorController.dispose();
     super.dispose();
   }
 
   Future<void> _bootstrap() async {
     _timer?.cancel();
     if (_pulse.isAnimating) _pulse.stop();
+    _doorController.reset();
     for (final item in rubric.rubric.items) {
       item.completed = false;
     }
@@ -237,10 +243,13 @@ class _TherapeuticExerciseStationTimedState extends State<TherapeuticExerciseSta
   }
 
   Future<void> _enterStation() async {
+    if (!mounted) return;
     setState(() => _transitioning = true);
     await Bell.playStartBell();
     _flash();
-    await Future.delayed(const Duration(milliseconds: 650));
+    await Future.delayed(const Duration(milliseconds: 180));
+    if (!mounted) return;
+    await _doorController.forward(from: 0);
     if (!mounted) return;
     setState(() {
       _transitioning = false;
@@ -248,6 +257,7 @@ class _TherapeuticExerciseStationTimedState extends State<TherapeuticExerciseSta
       remaining = stationSeconds;
       _warningBellPlayed = false;
     });
+    _doorController.reset();
     _startTimer();
   }
 
@@ -341,7 +351,7 @@ class _TherapeuticExerciseStationTimedState extends State<TherapeuticExerciseSta
           else
             SingleChildScrollView(padding: const EdgeInsets.fromLTRB(18, 8, 18, 110), child: inDoorPhase ? _doorView() : _stationView()),
           IgnorePointer(child: AnimatedOpacity(opacity: _flashOpacity, duration: const Duration(milliseconds: 120), child: Container(color: timerColor))),
-          if (_transitioning) Positioned.fill(child: Container(color: LuxTheme.black.withValues(alpha: .92), child: const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.door_front_door_outlined, color: _blue, size: 52), SizedBox(height: 16), Text('DOOR TIME COMPLETE', style: TextStyle(color: _blue, fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 1.3)), SizedBox(height: 7), Text('Begin station', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900))])))),
+          if (_transitioning) Positioned.fill(child: _PhysicalDoorTransition(progress: _doorAnimation)),
           if (_isLocked) Positioned.fill(child: Container(color: Colors.black.withValues(alpha: .70), child: const Center(child: Text('TIME — STOP', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: 2, color: Colors.white))))),
         ])),
       ),
@@ -361,8 +371,6 @@ class _TherapeuticExerciseStationTimedState extends State<TherapeuticExerciseSta
         _contentCard(const Text('No candidate tasks were found for this lesson.', style: TextStyle(color: LuxTheme.textSecondary)))
       else
         _contentCard(Column(children: _tasks.asMap().entries.map((entry) => Padding(padding: const EdgeInsets.only(bottom: 11), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(width: 24, height: 24, alignment: Alignment.center, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: _blue.withValues(alpha: .7))), child: Text('${entry.key + 1}', style: const TextStyle(color: _blue, fontSize: 10, fontWeight: FontWeight.w900))), const SizedBox(width: 10), Expanded(child: Text(entry.value['label'] ?? '', style: const TextStyle(color: Colors.white, height: 1.38, fontWeight: FontWeight.w600)))]))).toList())),
-      const SizedBox(height: 14),
-      Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: _blue.withValues(alpha: .06), borderRadius: BorderRadius.circular(16), border: Border.all(color: _blue.withValues(alpha: .30))), child: const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(Icons.lightbulb_outline_rounded, color: _blue, size: 19), SizedBox(width: 10), Expanded(child: Text('Remember warm-up, breathing, discomfort vs pain, and DOMS.', style: TextStyle(color: LuxTheme.textSecondary, height: 1.4, fontStyle: FontStyle.italic)))])),
     ]);
   }
 
@@ -436,5 +444,147 @@ class _TherapeuticExerciseStationTimedState extends State<TherapeuticExerciseSta
   Widget _rubricAction(OsceRubricItem item) {
     final done = item.completed;
     return Padding(padding: const EdgeInsets.only(bottom: 9), child: InkWell(borderRadius: BorderRadius.circular(17), onTap: _isLocked ? null : () => setState(() => item.completed = !item.completed), child: AnimatedContainer(duration: const Duration(milliseconds: 150), padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: done ? _blue.withValues(alpha: .10) : LuxTheme.panel, borderRadius: BorderRadius.circular(17), border: Border.all(color: done ? _blue : _blue.withValues(alpha: .34))), child: Row(children: [Icon(done ? Icons.check_circle_rounded : Icons.circle_outlined, color: _blue, size: 21), const SizedBox(width: 10), Expanded(child: Text(item.label, style: const TextStyle(color: Colors.white, fontSize: 12.5, height: 1.35, fontWeight: FontWeight.w600))), const SizedBox(width: 8), Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5), decoration: BoxDecoration(color: _blue.withValues(alpha: .09), borderRadius: BorderRadius.circular(99), border: Border.all(color: _blue.withValues(alpha: .35))), child: Text('+${item.points}', style: const TextStyle(color: _blue, fontSize: 10.5, fontWeight: FontWeight.w900)))]))));
+  }
+}
+
+class _PhysicalDoorTransition extends StatelessWidget {
+  final Animation<double> progress;
+
+  const _PhysicalDoorTransition({required this.progress});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: progress,
+      builder: (context, child) {
+        final t = progress.value;
+        final angle = -t * (math.pi / 2.15);
+        final roomOpacity = Curves.easeIn.transform(t).clamp(0.0, 1.0);
+        return Material(
+          color: const Color(0xFF080A0D),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Opacity(
+                opacity: roomOpacity,
+                child: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0xFF142332), Color(0xFF08111A)],
+                    ),
+                  ),
+                  child: const Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.medical_services_outlined, color: LuxTheme.accentGlow, size: 42),
+                        SizedBox(height: 12),
+                        Text('STATION ROOM', style: TextStyle(color: LuxTheme.accentGlow, fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 1.8)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 18),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2B1A10),
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(color: const Color(0xFF5C3A24), width: 10),
+                    boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 24, spreadRadius: 4)],
+                  ),
+                  child: ClipRect(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Transform(
+                        alignment: Alignment.centerLeft,
+                        transform: Matrix4.identity()
+                          ..setEntry(3, 2, 0.0017)
+                          ..rotateY(angle),
+                        child: Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [Color(0xFF8A5832), Color(0xFF6B3F22), Color(0xFF4B2A18)],
+                              stops: [0, .55, 1],
+                            ),
+                            border: Border.all(color: const Color(0xFF321A0D), width: 3),
+                            boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 12)],
+                          ),
+                          child: Stack(
+                            children: [
+                              Positioned(left: 28, right: 28, top: 42, height: 150, child: _DoorPanel()),
+                              Positioned(left: 28, right: 28, bottom: 42, height: 210, child: _DoorPanel()),
+                              Positioned(
+                                right: 28,
+                                top: MediaQuery.of(context).size.height * .43,
+                                child: Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: const RadialGradient(colors: [Color(0xFFFFE6A6), Color(0xFFC99538), Color(0xFF6D4714)]),
+                                    border: Border.all(color: const Color(0xFF4B300F), width: 2),
+                                    boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 7, offset: Offset(2, 3))],
+                                  ),
+                                  child: Center(child: Container(width: 13, height: 5, decoration: BoxDecoration(color: const Color(0xFF5A3A12), borderRadius: BorderRadius.circular(3)))),
+                                ),
+                              ),
+                              Positioned(
+                                left: 0,
+                                right: 0,
+                                top: 18,
+                                child: Column(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                      decoration: BoxDecoration(color: Colors.black.withValues(alpha: .36), borderRadius: BorderRadius.circular(99)),
+                                      child: const Text('DOOR TIME COMPLETE', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.3)),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    const Text('Enter station', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, shadows: [Shadow(color: Colors.black87, blurRadius: 8)])),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _DoorPanel extends StatelessWidget {
+  const _DoorPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFF3B2112), width: 5),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF7B4B2A), Color(0xFF59331C)],
+        ),
+        boxShadow: const [
+          BoxShadow(color: Color(0x66000000), blurRadius: 7, offset: Offset(0, 4), blurStyle: BlurStyle.inner),
+        ],
+      ),
+    );
   }
 }
