@@ -60,11 +60,17 @@ class McqExamReviewScreen extends StatelessWidget {
             ..._actions(unanswered, weak).map((x) => Padding(padding: const EdgeInsets.only(bottom: 7), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [const Icon(Icons.arrow_forward_rounded, color: _blue, size: 15), const SizedBox(width: 8), Expanded(child: Text(x, style: const TextStyle(color: LuxTheme.textSecondary, height: 1.35, fontWeight: FontWeight.w600)))]))),
           ])),
           const SizedBox(height: 14),
-          _Section(title: 'TOPIC HIGHLIGHTS', icon: Icons.insights_outlined, child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Expanded(child: _TopicBox(title: 'REVIEW FIRST', entries: weak, color: const Color(0xFFFF6B6B))),
-            const SizedBox(width: 9),
-            Expanded(child: _TopicBox(title: 'STRONGEST', entries: strong, color: const Color(0xFF54E6A5))),
-          ])),
+          _Section(
+            title: topicPercent.length == 1 ? 'TOPIC PERFORMANCE' : 'TOPIC HIGHLIGHTS',
+            icon: Icons.insights_outlined,
+            child: topicPercent.length == 1
+                ? _SingleTopicPerformance(entry: topicPercent.entries.first)
+                : Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Expanded(child: _TopicBox(title: 'REVIEW FIRST', entries: weak, color: const Color(0xFFFF6B6B))),
+                    const SizedBox(width: 9),
+                    Expanded(child: _TopicBox(title: 'STRONGEST', entries: strong, color: const Color(0xFF54E6A5))),
+                  ]),
+          ),
           const SizedBox(height: 14),
           _Section(title: 'DETAILED BREAKDOWN', icon: Icons.bar_chart_rounded, child: topicKeys.isEmpty ? const Text('No topic breakdown is available.', style: TextStyle(color: LuxTheme.textSecondary)) : Column(children: topicKeys.map((k) {
             final got = topicCorrect[k] ?? 0; final total = topicTotal[k] ?? 0; final p = total == 0 ? 0.0 : got / total; final pct = (p * 100).round();
@@ -89,7 +95,7 @@ class McqExamReviewScreen extends StatelessWidget {
 
   List<String> _actions(int unanswered, List<MapEntry<String,double>> weak) {
     final a = <String>[];
-    if (weak.isNotEmpty) a.add('Review ${weak.first.key} first.');
+    if (weak.isNotEmpty) a.add(weak.length == 1 ? 'Review ${weak.first.key} before your next attempt.' : 'Review ${weak.first.key} first.');
     if (weak.length > 1) a.add('Then revisit ${weak[1].key}.');
     if (unanswered > 0) a.add('Improve pacing so fewer questions remain unanswered.');
     a.add('Repeat this lesson under the 60-minute timer.');
@@ -113,6 +119,35 @@ class _Section extends StatelessWidget {
   final String title; final IconData icon; final Widget child;
   const _Section({required this.title, required this.icon, required this.child});
   @override Widget build(BuildContext context) => Container(padding: const EdgeInsets.all(17), decoration: BoxDecoration(color: LuxTheme.panel, borderRadius: BorderRadius.circular(20), border: Border.all(color: LuxTheme.accentGlow.withValues(alpha: .5))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Icon(icon, color: LuxTheme.accentGlow, size: 20), const SizedBox(width: 8), Text(title, style: const TextStyle(color: LuxTheme.accentGlow, fontSize: 11.5, fontWeight: FontWeight.w900, letterSpacing: 1))]), const SizedBox(height: 13), child]));
+}
+
+class _SingleTopicPerformance extends StatelessWidget {
+  final MapEntry<String, double> entry;
+  const _SingleTopicPerformance({required this.entry});
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = (entry.value / 100).clamp(0.0, 1.0);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: LuxTheme.black.withValues(alpha: .35),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: LuxTheme.accentGlow.withValues(alpha: .42)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: Text(entry.key, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800))),
+          Text('${entry.value.toStringAsFixed(0)}%', style: const TextStyle(color: LuxTheme.accentGlow, fontSize: 15, fontWeight: FontWeight.w900)),
+        ]),
+        const SizedBox(height: 10),
+        ClipRRect(borderRadius: BorderRadius.circular(99), child: LinearProgressIndicator(value: progress, minHeight: 7, backgroundColor: Colors.white12, valueColor: const AlwaysStoppedAnimation(LuxTheme.accentGlow))),
+        const SizedBox(height: 9),
+        const Text('Your performance for this lesson topic.', style: TextStyle(color: LuxTheme.textSecondary, fontSize: 11.5, fontWeight: FontWeight.w600)),
+      ]),
+    );
+  }
 }
 
 class _TopicBox extends StatelessWidget {
