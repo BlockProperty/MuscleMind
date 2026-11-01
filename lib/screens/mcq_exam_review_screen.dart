@@ -13,639 +13,110 @@ class McqExamReviewScreen extends StatelessWidget {
   final Map<String, int> topicCorrect;
   final Map<String, int> topicTotal;
 
-  const McqExamReviewScreen({
-    super.key,
-    required this.category,
-    required this.lesson,
-    required this.score,
-    required this.totalQuestions,
-    required this.answeredCount,
-    required this.topicCorrect,
-    required this.topicTotal,
-  });
+  const McqExamReviewScreen({super.key, required this.category, required this.lesson, required this.score, required this.totalQuestions, required this.answeredCount, required this.topicCorrect, required this.topicTotal});
 
-  static const Color _blue = Color(0xFF39C2FF);
+  static const Color _blue = LuxTheme.accentGlow;
 
-  Color _scoreColor(double percent) {
-    if (percent >= 85) return Colors.greenAccent;
-    if (percent >= 70) return _blue;
-    if (percent >= 50) return Colors.orange;
-    return Colors.redAccent;
-  }
+  Color _scoreColor(double p) => p >= 85 ? const Color(0xFF54E6A5) : p >= 70 ? _blue : p >= 50 ? const Color(0xFFFFB547) : const Color(0xFFFF6B6B);
+  String _status(double p) => p >= 85 ? 'Strong Performance' : p >= 70 ? 'Good Progress' : p >= 50 ? 'Needs Reinforcement' : 'Focused Review Needed';
 
   @override
   Widget build(BuildContext context) {
-    final percent =
-        totalQuestions <= 0 ? 0.0 : (score / totalQuestions) * 100.0;
-    final percentLabel = percent.toStringAsFixed(1);
+    final percent = totalQuestions <= 0 ? 0.0 : score / totalQuestions * 100;
     final unanswered = math.max(0, totalQuestions - answeredCount);
-
+    final incorrect = math.max(0, answeredCount - score);
+    final topicKeys = <String>{...topicCorrect.keys, ...topicTotal.keys}.toList()..sort();
     final topicPercent = <String, double>{};
-    final topicKeys =
-        <String>{...topicCorrect.keys, ...topicTotal.keys}.toList()..sort();
-
-    for (final key in topicKeys) {
-      final got = topicCorrect[key] ?? 0;
-      final max = topicTotal[key] ?? 0;
-      if (max > 0) {
-        topicPercent[key] = (got / max) * 100.0;
-      }
+    for (final k in topicKeys) {
+      final total = topicTotal[k] ?? 0;
+      if (total > 0) topicPercent[k] = ((topicCorrect[k] ?? 0) / total) * 100;
     }
-
-    final sortedTopics = topicPercent.entries.toList()
-      ..sort((a, b) => a.value.compareTo(b.value));
-
-    final weakest = sortedTopics.take(3).toList();
-    final strongest = sortedTopics.reversed.take(3).toList();
-
-    final insight = _buildInsight(
-      percent: percent,
-      unanswered: unanswered,
-      weakest: weakest,
-    );
-
-    final actions = _buildActionPlan(
-      unanswered: unanswered,
-      weakest: weakest,
-    );
+    final sorted = topicPercent.entries.toList()..sort((a,b) => a.value.compareTo(b.value));
+    final weak = sorted.take(3).toList();
+    final strong = sorted.reversed.take(3).toList();
+    final color = _scoreColor(percent);
 
     return Scaffold(
       backgroundColor: LuxTheme.black,
-      appBar: AppBar(
-        title: const Text('MCQ Review'),
-        centerTitle: true,
-      ),
-      body: LuxBackground(
-        child: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              _McqHeroCard(
-                category: category,
-                lesson: lesson,
-                score: score,
-                totalQuestions: totalQuestions,
-                percentLabel: percentLabel,
-                percent: percent,
-                scoreColor: _scoreColor(percent),
-              ),
-              const SizedBox(height: 18),
-              _McqInsightsCard(
-                percent: percent,
-                unanswered: unanswered,
-                insight: insight,
-                actions: actions,
-              ),
-              const SizedBox(height: 18),
-              _McqTopicBreakdownCard(
-                weakest: weakest,
-                strongest: strongest,
-              ),
-              const SizedBox(height: 18),
-              _McqTotalsCard(
-                answeredCount: answeredCount,
-                totalQuestions: totalQuestions,
-                unanswered: unanswered,
-              ),
-              const SizedBox(height: 18),
-              _McqTopicTotalsCard(
-                topicKeys: topicKeys,
-                topicCorrect: topicCorrect,
-                topicTotal: topicTotal,
-              ),
-              const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('RETRY LESSON'),
-                ),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Back'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _buildInsight({
-    required double percent,
-    required int unanswered,
-    required List<MapEntry<String, double>> weakest,
-  }) {
-    final weakTopic = weakest.isNotEmpty ? weakest.first.key : null;
-
-    if (percent >= 85) {
-      return 'Strong MCQ performance. You are showing good recall and decision-making speed. Keep refining precision and consistency.';
-    }
-    if (percent >= 70) {
-      if (weakTopic != null) {
-        return 'Good progress overall. Your lowest area is $weakTopic, and improving it should raise your exam readiness quickly.';
-      }
-      return 'Good progress overall. Tighten weak spots and keep building consistency.';
-    }
-    if (percent >= 50) {
-      if (weakTopic != null) {
-        return 'Developing performance. $weakTopic appears to be limiting your score. Focused lesson review is recommended.';
-      }
-      return 'Developing performance. Review key concepts and repeat this lesson under timed conditions.';
-    }
-
-    if (unanswered > 0) {
-      return 'Low score with unanswered questions suggests pacing and confidence are both affecting performance. Review fundamentals and practice timing.';
-    }
-
-    return 'Low score suggests core knowledge gaps in this lesson. Slow down, rebuild fundamentals, then retest.';
-  }
-
-  List<String> _buildActionPlan({
-    required int unanswered,
-    required List<MapEntry<String, double>> weakest,
-  }) {
-    final actions = <String>[];
-
-    if (weakest.isNotEmpty) {
-      actions.add('Review ${weakest.first.key.toLowerCase()} first.');
-    }
-    if (weakest.length > 1) {
-      actions.add('Then revisit ${weakest[1].key.toLowerCase()}.');
-    }
-    if (unanswered > 0) {
-      actions.add('Work on pacing to reduce unanswered questions.');
-    }
-    actions.add('Repeat this lesson in timed mode.');
-    return actions.take(4).toList();
-  }
-}
-
-class _McqHeroCard extends StatelessWidget {
-  final String category;
-  final int lesson;
-  final int score;
-  final int totalQuestions;
-  final String percentLabel;
-  final double percent;
-  final Color scoreColor;
-
-  const _McqHeroCard({
-    required this.category,
-    required this.lesson,
-    required this.score,
-    required this.totalQuestions,
-    required this.percentLabel,
-    required this.percent,
-    required this.scoreColor,
-  });
-
-  static const Color _blue = Color(0xFF39C2FF);
-
-  @override
-  Widget build(BuildContext context) {
-    final progress =
-        totalQuestions <= 0 ? 0.0 : (score / totalQuestions).clamp(0.0, 1.0);
-
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: LuxTheme.panel,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: _blue.withOpacity(0.28)),
-        boxShadow: [
-          BoxShadow(
-            color: _blue.withOpacity(0.08),
-            blurRadius: 20,
-            spreadRadius: 1,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
+      appBar: AppBar(title: const Text('Exam Results'), centerTitle: true),
+      body: LuxBackground(child: SafeArea(child: ListView(
+        padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: _blue.withOpacity(0.22),
-                  blurRadius: 30,
-                  spreadRadius: 6,
-                ),
-              ],
-            ),
-            child: Image.asset(
-              'assets/logo/musclemind_icon.png',
-              width: 82,
-              height: 82,
-              fit: BoxFit.contain,
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'MCQ EXAM REVIEW',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: _blue,
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.5,
-            ),
-          ),
+          _Hero(category: category, lesson: lesson, score: score, total: totalQuestions, percent: percent, color: color, status: _status(percent)),
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(child: _Metric(icon: Icons.check_circle_outline_rounded, value: '$score', label: 'Correct', color: const Color(0xFF54E6A5))),
+            const SizedBox(width: 9),
+            Expanded(child: _Metric(icon: Icons.close_rounded, value: '$incorrect', label: 'Incorrect', color: const Color(0xFFFF6B6B))),
+            const SizedBox(width: 9),
+            Expanded(child: _Metric(icon: Icons.help_outline_rounded, value: '$unanswered', label: 'Unanswered', color: const Color(0xFFFFB547))),
+          ]),
+          const SizedBox(height: 14),
+          _Section(title: 'PERFORMANCE INSIGHT', icon: Icons.psychology_alt_outlined, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(_insight(percent, unanswered, weak), style: const TextStyle(color: Colors.white, fontSize: 13.5, height: 1.5, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 14),
+            const Text('NEXT STEPS', style: TextStyle(color: _blue, fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: 1.1)),
+            const SizedBox(height: 8),
+            ..._actions(unanswered, weak).map((x) => Padding(padding: const EdgeInsets.only(bottom: 7), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [const Icon(Icons.arrow_forward_rounded, color: _blue, size: 15), const SizedBox(width: 8), Expanded(child: Text(x, style: const TextStyle(color: LuxTheme.textSecondary, height: 1.35, fontWeight: FontWeight.w600)))]))),
+          ])),
+          const SizedBox(height: 14),
+          _Section(title: 'TOPIC HIGHLIGHTS', icon: Icons.insights_outlined, child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(child: _TopicBox(title: 'REVIEW FIRST', entries: weak, color: const Color(0xFFFF6B6B))),
+            const SizedBox(width: 9),
+            Expanded(child: _TopicBox(title: 'STRONGEST', entries: strong, color: const Color(0xFF54E6A5))),
+          ])),
+          const SizedBox(height: 14),
+          _Section(title: 'DETAILED BREAKDOWN', icon: Icons.bar_chart_rounded, child: topicKeys.isEmpty ? const Text('No topic breakdown is available.', style: TextStyle(color: LuxTheme.textSecondary)) : Column(children: topicKeys.map((k) {
+            final got = topicCorrect[k] ?? 0; final total = topicTotal[k] ?? 0; final p = total == 0 ? 0.0 : got / total; final pct = (p * 100).round();
+            return Padding(padding: const EdgeInsets.only(bottom: 14), child: Column(children: [Row(children: [Expanded(child: Text(k, style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w700))), Text('$got/$total • $pct%', style: const TextStyle(color: _blue, fontSize: 11.5, fontWeight: FontWeight.w800))]), const SizedBox(height: 7), ClipRRect(borderRadius: BorderRadius.circular(99), child: LinearProgressIndicator(value: p, minHeight: 6, backgroundColor: Colors.white12, valueColor: const AlwaysStoppedAnimation(_blue)))]));
+          }).toList())),
+          const SizedBox(height: 18),
+          ElevatedButton.icon(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.replay_rounded), label: const Text('RETRY LESSON'), style: ElevatedButton.styleFrom(backgroundColor: _blue, foregroundColor: const Color(0xFF06131E), padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)), textStyle: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: .7))),
           const SizedBox(height: 10),
-          Text(
-            '$category • Lesson $lesson',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.74),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            '$score / $totalQuestions',
-            style: TextStyle(
-              color: scoreColor,
-              fontSize: 30,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '$percentLabel%',
-            style: TextStyle(
-              color: scoreColor,
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 10,
-              backgroundColor: Colors.white.withOpacity(0.08),
-              valueColor: AlwaysStoppedAnimation<Color>(scoreColor),
-            ),
-          ),
+          OutlinedButton.icon(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back_rounded), label: const Text('BACK TO LESSON'), style: OutlinedButton.styleFrom(foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 15), side: BorderSide(color: _blue.withValues(alpha: .6)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)))),
         ],
-      ),
+      ))),
     );
+  }
+
+  String _insight(double p, int unanswered, List<MapEntry<String,double>> weak) {
+    final topic = weak.isEmpty ? null : weak.first.key;
+    if (p >= 85) return 'Strong recall and decision-making. Keep practicing under timed conditions to maintain accuracy and consistency.';
+    if (p >= 70) return topic == null ? 'Good progress overall. Tighten weaker concepts and keep building consistency.' : 'Good progress overall. Improving $topic should raise your score further.';
+    if (p >= 50) return topic == null ? 'Your foundation is developing. Review key concepts, then repeat this lesson.' : '$topic is currently your lowest-performing area. Focused review there is recommended before your next attempt.';
+    return unanswered > 0 ? 'Knowledge gaps and pacing may both be affecting this attempt. Review the fundamentals and work toward answering every question.' : 'This result suggests important knowledge gaps. Review the fundamentals carefully, then retest.';
+  }
+
+  List<String> _actions(int unanswered, List<MapEntry<String,double>> weak) {
+    final a = <String>[];
+    if (weak.isNotEmpty) a.add('Review ${weak.first.key} first.');
+    if (weak.length > 1) a.add('Then revisit ${weak[1].key}.');
+    if (unanswered > 0) a.add('Improve pacing so fewer questions remain unanswered.');
+    a.add('Repeat this lesson under the 60-minute timer.');
+    return a.take(4).toList();
   }
 }
 
-class _McqInsightsCard extends StatelessWidget {
-  final double percent;
-  final int unanswered;
-  final String insight;
-  final List<String> actions;
-
-  const _McqInsightsCard({
-    required this.percent,
-    required this.unanswered,
-    required this.insight,
-    required this.actions,
-  });
-
-  static const Color _blue = Color(0xFF39C2FF);
-
-  String get _status {
-    if (percent >= 85) return 'High Readiness';
-    if (percent >= 70) return 'Good Progress';
-    if (percent >= 50) return 'Needs Reinforcement';
-    return 'Critical Review Needed';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: LuxTheme.panel,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: _blue.withOpacity(0.28)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'PERFORMANCE INSIGHT',
-            style: TextStyle(
-              color: _blue,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.1,
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.18),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: _blue.withOpacity(0.22)),
-            ),
-            child: Text(
-              _status,
-              style: const TextStyle(
-                color: _blue,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.4,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            insight,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.85),
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Unanswered: $unanswered',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.72),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 14),
-          const Text(
-            'ACTION PLAN',
-            style: TextStyle(
-              color: _blue,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.9,
-              fontSize: 12.5,
-            ),
-          ),
-          const SizedBox(height: 8),
-          ...actions.map(
-            (item) => Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Text(
-                '• $item',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.78),
-                  height: 1.35,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+class _Hero extends StatelessWidget {
+  final String category, status; final int lesson, score, total; final double percent; final Color color;
+  const _Hero({required this.category, required this.lesson, required this.score, required this.total, required this.percent, required this.color, required this.status});
+  @override Widget build(BuildContext context) => Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: LuxTheme.panel, borderRadius: BorderRadius.circular(24), border: Border.all(color: LuxTheme.accentGlow.withValues(alpha: .75)), boxShadow: [BoxShadow(color: LuxTheme.accentGlow.withValues(alpha: .1), blurRadius: 24, offset: const Offset(0,10))]), child: Column(children: [Text(category.toUpperCase(), textAlign: TextAlign.center, style: const TextStyle(color: LuxTheme.accentGlow, fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: 1.3)), const SizedBox(height: 5), Text('Lesson $lesson Results', style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)), const SizedBox(height: 18), Container(width: 128, height: 128, decoration: BoxDecoration(shape: BoxShape.circle, color: LuxTheme.black.withValues(alpha: .45), border: Border.all(color: color, width: 5), boxShadow: [BoxShadow(color: color.withValues(alpha: .15), blurRadius: 24)]), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text('${percent.toStringAsFixed(0)}%', style: const TextStyle(color: Colors.white, fontSize: 31, fontWeight: FontWeight.w900)), Text('$score / $total', style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w800))])), const SizedBox(height: 14), Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7), decoration: BoxDecoration(color: color.withValues(alpha: .1), borderRadius: BorderRadius.circular(99), border: Border.all(color: color.withValues(alpha: .55))), child: Text(status, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12)))]));
 }
 
-class _McqTopicBreakdownCard extends StatelessWidget {
-  final List<MapEntry<String, double>> weakest;
-  final List<MapEntry<String, double>> strongest;
-
-  const _McqTopicBreakdownCard({
-    required this.weakest,
-    required this.strongest,
-  });
-
-  static const Color _blue = Color(0xFF39C2FF);
-
-  Widget _buildList(
-    String title,
-    List<MapEntry<String, double>> data,
-    Color accent,
-  ) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.14),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: accent.withOpacity(0.35)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: TextStyle(
-                color: accent,
-                fontWeight: FontWeight.w900,
-                fontSize: 12.5,
-                letterSpacing: 0.7,
-              ),
-            ),
-            const SizedBox(height: 10),
-            if (data.isEmpty)
-              Text(
-                'No data',
-                style: TextStyle(color: Colors.white.withOpacity(0.55)),
-              )
-            else
-              ...data.map(
-                (e) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Text(
-                    '${e.key} • ${e.value.toStringAsFixed(0)}%',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.82),
-                      height: 1.3,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: LuxTheme.panel,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: _blue.withOpacity(0.28)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'TOPIC BREAKDOWN',
-            style: TextStyle(
-              color: _blue,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.1,
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildList('WEAKEST AREAS', weakest, Colors.redAccent),
-              const SizedBox(width: 12),
-              _buildList('STRONGEST AREAS', strongest, Colors.greenAccent),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+class _Metric extends StatelessWidget {
+  final IconData icon; final String value, label; final Color color;
+  const _Metric({required this.icon, required this.value, required this.label, required this.color});
+  @override Widget build(BuildContext context) => Container(padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 13), decoration: BoxDecoration(color: LuxTheme.panel, borderRadius: BorderRadius.circular(17), border: Border.all(color: color.withValues(alpha: .45))), child: Column(children: [Icon(icon, color: color, size: 20), const SizedBox(height: 6), Text(value, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)), Text(label, textAlign: TextAlign.center, style: const TextStyle(color: LuxTheme.textSecondary, fontSize: 10, fontWeight: FontWeight.w700))]));
 }
 
-class _McqTotalsCard extends StatelessWidget {
-  final int answeredCount;
-  final int totalQuestions;
-  final int unanswered;
-
-  const _McqTotalsCard({
-    required this.answeredCount,
-    required this.totalQuestions,
-    required this.unanswered,
-  });
-
-  static const Color _blue = Color(0xFF39C2FF);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: LuxTheme.panel,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: _blue.withOpacity(0.28)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'EXAM TOTALS',
-            style: TextStyle(
-              color: _blue,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.1,
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(height: 14),
-          _row('Answered', answeredCount.toString()),
-          _row('Unanswered', unanswered.toString()),
-          _row('Total Questions', totalQuestions.toString()),
-        ],
-      ),
-    );
-  }
-
-  Widget _row(String left, String right) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              left,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Text(
-            right,
-            style: const TextStyle(
-              color: _blue,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+class _Section extends StatelessWidget {
+  final String title; final IconData icon; final Widget child;
+  const _Section({required this.title, required this.icon, required this.child});
+  @override Widget build(BuildContext context) => Container(padding: const EdgeInsets.all(17), decoration: BoxDecoration(color: LuxTheme.panel, borderRadius: BorderRadius.circular(20), border: Border.all(color: LuxTheme.accentGlow.withValues(alpha: .5))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Icon(icon, color: LuxTheme.accentGlow, size: 20), const SizedBox(width: 8), Text(title, style: const TextStyle(color: LuxTheme.accentGlow, fontSize: 11.5, fontWeight: FontWeight.w900, letterSpacing: 1))]), const SizedBox(height: 13), child]));
 }
 
-class _McqTopicTotalsCard extends StatelessWidget {
-  final List<String> topicKeys;
-  final Map<String, int> topicCorrect;
-  final Map<String, int> topicTotal;
-
-  const _McqTopicTotalsCard({
-    required this.topicKeys,
-    required this.topicCorrect,
-    required this.topicTotal,
-  });
-
-  static const Color _blue = Color(0xFF39C2FF);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: LuxTheme.panel,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: _blue.withOpacity(0.28)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'TOPIC TOTALS',
-            style: TextStyle(
-              color: _blue,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.1,
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(height: 14),
-          if (topicKeys.isEmpty)
-            Text(
-              'No topic breakdown available.',
-              style: TextStyle(color: Colors.white.withOpacity(0.68)),
-            )
-          else
-            ...topicKeys.map((topic) {
-              final got = topicCorrect[topic] ?? 0;
-              final max = topicTotal[topic] ?? 0;
-              final pct = max > 0 ? (got / max) * 100.0 : 0.0;
-
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        topic,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      '$got / $max (${pct.toStringAsFixed(0)}%)',
-                      style: const TextStyle(
-                        color: _blue,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
-        ],
-      ),
-    );
-  }
+class _TopicBox extends StatelessWidget {
+  final String title; final List<MapEntry<String,double>> entries; final Color color;
+  const _TopicBox({required this.title, required this.entries, required this.color});
+  @override Widget build(BuildContext context) => Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: LuxTheme.black.withValues(alpha: .35), borderRadius: BorderRadius.circular(15), border: Border.all(color: color.withValues(alpha: .38))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: TextStyle(color: color, fontSize: 9.5, fontWeight: FontWeight.w900, letterSpacing: .7)), const SizedBox(height: 8), if (entries.isEmpty) const Text('No topic data', style: TextStyle(color: LuxTheme.textSecondary, fontSize: 11)) else ...entries.map((e) => Padding(padding: const EdgeInsets.only(bottom: 7), child: Text('${e.key}\n${e.value.toStringAsFixed(0)}%', style: const TextStyle(color: Colors.white, fontSize: 11, height: 1.3, fontWeight: FontWeight.w700))))]));
 }
